@@ -3,7 +3,10 @@ import { createRoot } from "react-dom/client";
 import axios from "axios";
 import "./styles.css";
 
-const API_URL = import.meta.env?.VITE_API_URL || "http://localhost:4005";
+const defaultApiUrl = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  ? "http://localhost:4005"
+  : "/api";
+const API_URL = import.meta.env?.VITE_API_URL || defaultApiUrl;
 const api = axios.create({ baseURL: API_URL });
 const fallbackAnswer = "Answer not found in the uploaded documents.";
 
