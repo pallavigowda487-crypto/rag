@@ -2,15 +2,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-let _appPromise = null;
-
-async function loadApp() {
-	if (!_appPromise) {
-		const serverPath = new URL("../backend/src/server.js", import.meta.url).href;
-		_appPromise = import(serverPath).then(m => m.default);
-	}
-	return _appPromise;
-}
+import app from "../backend/src/server.js";
 
 async function getDebugInfo() {
 	const rootPath = path.dirname(fileURLToPath(import.meta.url));
@@ -51,7 +43,7 @@ export default async function handler(req, res) {
 		// Keep /api prefix in req.url for Express routes that include /api/ in their path
 		// The catch-all route already handles both /api and /api/* requests
 
-		const app = await loadApp();
+		// app is statically imported
 
 		// Call the express app and wait for the response to finish so
 		// we can surface any runtime errors back to Vercel.
