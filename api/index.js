@@ -6,7 +6,8 @@ let _appPromise = null;
 
 async function loadApp() {
 	if (!_appPromise) {
-		_appPromise = import("../backend/src/server.js").then(m => m.default);
+		const serverPath = new URL("../backend/src/server.js", import.meta.url).href;
+		_appPromise = import(serverPath).then(m => m.default);
 	}
 	return _appPromise;
 }
