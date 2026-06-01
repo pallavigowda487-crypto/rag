@@ -8,7 +8,7 @@
     "install:all": "npm install --prefix backend && npm install --prefix frontend",
     "dev": "concurrently \"npm run dev --prefix backend\" \"npm run serve:static --prefix frontend\"",
     "build": "npm install --prefix frontend && npm run build --prefix frontend",
-    "vercel-build": "npm run build",
+    "vercel-build": "npm install && npm install --prefix backend && npm run build",
     "check": "npm run check --prefix backend && npm run build --prefix frontend"
   },
   "devDependencies": {
