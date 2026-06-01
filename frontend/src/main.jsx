@@ -300,7 +300,12 @@ function App() {
 }
 
 function readError(error) {
-  return error.response?.data?.error || error.message || "Something went wrong.";
+  let message = error.response?.data?.error || error.message || "Something went wrong.";
+  // Ensure we always return a string, not an object
+  if (typeof message === 'object') {
+    message = message?.message || JSON.stringify(message);
+  }
+  return String(message);
 }
 
 createRoot(document.getElementById("root")).render(<App />);

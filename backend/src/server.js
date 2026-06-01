@@ -13,8 +13,8 @@ const app = express();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 15 * 1024 * 1024,
-    files: 50
+    fileSize: 5 * 1024 * 1024,  // 5MB per file to stay within Vercel's 6MB limit
+    files: 10  // Reduced from 50 for safety
   }
 });
 
