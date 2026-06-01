@@ -15,7 +15,30 @@ export default async function handler(req, res) {
 		}
 
 		const app = await loadApp();
-		return app(req, res);
+
+		// Call the express app and wait for the response to finish so
+		// we can surface any runtime errors back to Vercel.
+		await new Promise((resolve, reject) => {
+			let settled = false;
+
+			function done(err) {
+				if (settled) return;
+				settled = true;
+				if (err) return reject(err);
+				return resolve();
+			}
+
+			res.on("finish", () => done());
+			res.on("close", () => done());
+			res.on("error", (err) => done(err));
+
+			try {
+				app(req, res);
+			} catch (err) {
+				done(err);
+			}
+		});
+		return;
 	} catch (err) {
 		// Provide a clearer error response for debugging in Vercel logs
 		res.statusCode = 500;
