@@ -395,29 +395,32 @@ async function chunkText(text) {
 
 async function embedChunks(chunks, documentId, filename) {
   const vectors = [];
+  const promises = [];
 
   for (let i = 0; i < chunks.length; i += 48) {
     const batch = chunks.slice(i, i + 48);
-    const embeddings = await embedWithPinecone(
-      batch.map((chunk) => ({ text: `passage: ${chunk}` })),
-      "passage"
+    promises.push(
+      embedWithPinecone(
+        batch.map((chunk) => ({ text: `passage: ${chunk}` })),
+        "passage"
+      ).then(embeddings => {
+        embeddings.data.forEach((embedding, batchIndex) => {
+          vectors.push({
+            id: `${documentId}-${i + batchIndex}`,
+            values: embedding.values,
+            metadata: {
+              documentId,
+              filename,
+              chunkIndex: i + batchIndex,
+              text: batch[batchIndex]
+            }
+          });
+        });
+      })
     );
-
-    embeddings.data.forEach((embedding, batchIndex) => {
-      const chunkIndex = i + batchIndex;
-      vectors.push({
-        id: `${documentId}-${chunkIndex}`,
-        values: embedding.values,
-        metadata: {
-          documentId,
-          filename,
-          chunkIndex,
-          text: batch[batchIndex]
-        }
-      });
-    });
   }
 
+  await Promise.all(promises);
   return vectors;
 }
 
@@ -428,12 +431,16 @@ async function embedQuery(question) {
 }
 
 async function upsertInBatches(indexHost, vectors) {
+  const promises = [];
   for (let i = 0; i < vectors.length; i += 100) {
-    await pineconeDataRequest(indexHost, "/vectors/upsert", {
-      vectors: vectors.slice(i, i + 100),
-      namespace: config.pinecone.namespace
-    });
+    promises.push(
+      pineconeDataRequest(indexHost, "/vectors/upsert", {
+        vectors: vectors.slice(i, i + 100),
+        namespace: config.pinecone.namespace
+      })
+    );
   }
+  await Promise.all(promises);
 }
 
 async function embedWithPinecone(inputs, inputType) {
