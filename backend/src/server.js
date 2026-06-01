@@ -6,6 +6,7 @@ import mammoth from "mammoth";
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import { wrapOpenAI } from "langsmith/wrappers";
 import { traceable } from "langsmith/traceable";
+import { readFile } from "node:fs/promises";
 import { config, validateConfig } from "./config.js";
 
 const app = express();
@@ -37,6 +38,39 @@ app.get("/health", (_req, res) => {
       groq: fingerprint(config.llm.apiKey)
     },
     missingConfig: validateConfig()
+  });
+});
+
+app.get("/debug", async (_req, res) => {
+  const safeEnv = {};
+  const secretPattern = /(?:KEY|TOKEN|SECRET|PASSWORD|API|AUTH|CREDENTIAL)/i;
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (secretPattern.test(key)) {
+      safeEnv[key] = value ? "REDACTED" : "missing";
+    } else {
+      safeEnv[key] = value ?? "missing";
+    }
+  }
+
+  const rootPkgPath = new URL("../package.json", import.meta.url);
+  const backendPkgPath = new URL("../backend/package.json", import.meta.url);
+  const rootPkg = JSON.parse(await readFile(rootPkgPath, "utf-8"));
+  const backendPkg = JSON.parse(await readFile(backendPkgPath, "utf-8"));
+  const dependencies = [
+    ...Object.keys(rootPkg.dependencies || {}),
+    ...Object.keys(rootPkg.devDependencies || {}),
+    ...Object.keys(backendPkg.dependencies || {}),
+    ...Object.keys(backendPkg.devDependencies || {})
+  ].sort();
+
+  res.json({
+    ok: true,
+    nodeVersion: process.version,
+    platform: process.platform,
+    env: safeEnv,
+    dependencies,
+    note: "Temporary debug endpoint. Do not leave enabled in production."
   });
 });
 
