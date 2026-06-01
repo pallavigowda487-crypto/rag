@@ -71,7 +71,7 @@ function App() {
     }
 
     try {
-      const { data } = await api.post("/api/upload", formData, {
+      const { data } = await api.post("/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
           if (!progressEvent.total) return;
@@ -110,7 +110,7 @@ function App() {
       // Build conversation history excluding citations for the API
       const historyText = messages.map(m => ({ role: m.role, content: m.content }));
       
-      const { data } = await api.post("/api/query", { 
+      const { data } = await api.post("/query", { 
         question: cleanQuestion,
         filename: activeFile === "all" ? undefined : activeFile,
         conversationHistory: historyText
@@ -136,7 +136,7 @@ function App() {
   async function handleReset() {
     setError("");
     try {
-      await api.delete("/api/reset");
+      await api.delete("/reset");
       setActiveDocuments([]);
       setActiveFile(null);
       setMessages([]);

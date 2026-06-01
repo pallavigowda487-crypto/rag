@@ -77,10 +77,9 @@ export default async function handler(req, res) {
 		});
 		return;
 	} catch (err) {
-		// Provide a clearer error response for debugging in Vercel logs
+		// Return JSON error response so frontend can parse it correctly
 		res.statusCode = 500;
-		const message = `Server error: ${err.message || String(err)}`;
-		res.setHeader("Content-Type", "text/plain; charset=utf-8");
-		res.end(message);
+		res.setHeader("Content-Type", "application/json; charset=utf-8");
+		res.end(JSON.stringify({ error: err.message || String(err) }));
 	}
 }
