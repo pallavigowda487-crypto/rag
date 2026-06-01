@@ -61,30 +61,42 @@ function App() {
       return;
     }
 
+    const oversized = selectedFiles.filter(f => f.size > 4 * 1024 * 1024);
+    if (oversized.length > 0) {
+      setError(`Vercel limits requests to 4.5MB. Please compress files over 4MB: ${oversized.map(f => f.name).join(', ')}`);
+      return;
+    }
+
     setError("");
     setIsUploading(true);
     setUploadProgress(0);
 
-    const formData = new FormData();
-    for (let i = 0; i < selectedFiles.length; i++) {
-      formData.append("files", selectedFiles[i]);
-    }
-
     try {
-      const { data } = await api.post("/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        onUploadProgress: (progressEvent) => {
-          if (!progressEvent.total) return;
-          setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
-        }
-      });
+      let finalActiveDocs = activeDocuments;
+      let anyUploaded = false;
 
-      setActiveDocuments(data.activeDocuments);
-      if (data.documents && data.documents.length > 0) {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const formData = new FormData();
+        formData.append("files", file);
+
+        const { data } = await api.post("/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+
+        finalActiveDocs = data.activeDocuments;
+        if (data.documents && data.documents.length > 0) {
+          anyUploaded = true;
+        }
+        
+        setUploadProgress(Math.round(((i + 1) / selectedFiles.length) * 100));
+      }
+
+      setActiveDocuments(finalActiveDocs);
+      if (anyUploaded) {
         setActiveFile("all");
       }
       setSelectedFiles([]);
-      setUploadProgress(100);
       if (fileInputRef.current) fileInputRef.current.value = "";
       setTimeout(() => setUploadProgress(0), 2000);
     } catch (uploadError) {
