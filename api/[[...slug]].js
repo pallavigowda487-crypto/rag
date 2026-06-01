@@ -48,10 +48,8 @@ export default async function handler(req, res) {
 			return;
 		}
 
-		// Adjust request path: strip leading /api so Express routes match
-		if (req.url && req.url.startsWith("/api")) {
-			req.url = req.url.replace(/^\/api/, "") || "/";
-		}
+		// Keep /api prefix in req.url for Express routes that include /api/ in their path
+		// The catch-all route already handles both /api and /api/* requests
 
 		const app = await loadApp();
 
@@ -80,15 +78,8 @@ export default async function handler(req, res) {
 		return;
 	} catch (err) {
 		// Provide a clearer error response for debugging in Vercel logs
-		if (req.url && req.url.startsWith("/api") && ['/api/debug', '/api/_debug', '/debug', '/_debug'].includes(new URL(req.url, 'http://localhost').pathname)) {
-			const debugInfo = await getDebugInfo();
-			res.setHeader("Content-Type", "application/json; charset=utf-8");
-			res.statusCode = 500;
-			res.end(JSON.stringify({ ok: false, error: err.message || String(err), debug: debugInfo }, null, 2));
-			return;
-		}
 		res.statusCode = 500;
-		const message = `Server import error: ${err.message || String(err)}`;
+		const message = `Server error: ${err.message || String(err)}`;
 		res.setHeader("Content-Type", "text/plain; charset=utf-8");
 		res.end(message);
 	}

@@ -25,7 +25,7 @@ const llm = wrapOpenAI(new OpenAI({
 
 let activeDocuments = [];
 
-app.use(cors({ origin: config.frontendOrigin, credentials: false }));
+app.use(cors({ origin: config.corsOrigin, credentials: false }));
 app.use(express.json({ limit: "50mb" })); // Increased limit for bulk queries if needed
 
 app.get("/health", (_req, res) => {

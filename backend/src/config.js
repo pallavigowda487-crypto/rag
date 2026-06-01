@@ -31,8 +31,37 @@ export const config = {
     apiKey: env("GROQ_API_KEY"),
     model: env("GROQ_MODEL", "llama-3.3-70b-versatile"),
     baseURL: env("GROQ_API_URL", "https://api.groq.com/openai/v1")
-  }
+  },
+  corsOrigin: getCorsOrigin()
 };
+
+function getCorsOrigin() {
+  // Allow Vercel deployments and localhost in development
+  const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173"
+  ];
+  
+  // Add configured FRONTEND_ORIGIN
+  const configured = env("FRONTEND_ORIGIN", "");
+  if (configured && !allowedOrigins.includes(configured)) {
+    allowedOrigins.push(configured);
+  }
+  
+  // In production on Vercel, allow same origin
+  if (process.env.VERCEL_URL) {
+    allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
+  }
+  
+  return (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow for now; can be more restrictive
+    }
+  };
+}
 
 export function validateConfig() {
   const missing = [];
