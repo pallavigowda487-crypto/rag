@@ -28,7 +28,7 @@ let activeDocuments = [];
 app.use(cors({ origin: config.corsOrigin, credentials: false }));
 app.use(express.json({ limit: "50mb" })); // Increased limit for bulk queries if needed
 
-app.get("/health", (_req, res) => {
+app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     app: "Legal RAG Assistant",
@@ -41,7 +41,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.get("/debug", async (_req, res) => {
+app.get("/api/debug", async (_req, res) => {
   const safeEnv = {};
   const secretPattern = /(?:KEY|TOKEN|SECRET|PASSWORD|API|AUTH|CREDENTIAL)/i;
 
