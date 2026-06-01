@@ -24,11 +24,5 @@
       "src": "/api(?:/(.*))?$",
       "dest": "/api/[[...slug]].js"
     }
-  ],
-  "functions": {
-    "api/[[...slug]].js": {
-      "maxDuration": 60,
-      "memory": 3008
-    }
-  }
+  ]
 }
