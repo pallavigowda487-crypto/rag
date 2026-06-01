@@ -4,6 +4,12 @@ import path from "node:path";
 
 import app from "../backend/src/server.js";
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 async function getDebugInfo() {
 	const rootPath = path.dirname(fileURLToPath(import.meta.url));
 	const rootPkgPath = path.join(rootPath, "package.json");
