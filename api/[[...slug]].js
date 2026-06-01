@@ -13,7 +13,7 @@ async function loadApp() {
 }
 
 async function getDebugInfo() {
-	const rootPath = path.dirname(fileURLToPath(new URL("./index.js", import.meta.url)));
+	const rootPath = path.dirname(fileURLToPath(import.meta.url));
 	const rootPkgPath = path.join(rootPath, "package.json");
 	const rootPkg = JSON.parse(await readFile(rootPkgPath, "utf-8"));
 	const dependencies = [
