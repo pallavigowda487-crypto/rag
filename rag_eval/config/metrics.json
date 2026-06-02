@@ -1,0 +1,11 @@
+{
+  "metrics": [
+    "faithfulness",
+    "answer_relevancy",
+    "context_recall",
+    "context_precision"
+  ],
+  "provider": "openai",
+  "output_csv": "results/raw/eval_results.csv",
+  "output_summary_json": "results/summaries/eval_summary.json"
+}

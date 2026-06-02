@@ -7,9 +7,11 @@
   "scripts": {
     "dev": "node src/server.js",
     "start": "node src/server.js",
-    "check": "node --check src/server.js"
+    "check": "node --check src/server.js",
+    "ragas:eval": "node src/ragas-eval/index.js"
   },
   "dependencies": {
+    "@iklovepolo/ragas-lib": "^0.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",

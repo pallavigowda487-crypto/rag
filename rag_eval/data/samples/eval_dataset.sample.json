@@ -1,0 +1,11 @@
+[
+  {
+    "question": "What is retrieval-augmented generation?",
+    "contexts": [
+      "Retrieval-augmented generation combines document retrieval with LLM generation.",
+      "The retriever fetches relevant context chunks before the model answers."
+    ],
+    "answer": "RAG is a pipeline where relevant documents are retrieved first and then used by an LLM to generate grounded answers.",
+    "ground_truth": "RAG retrieves relevant context and uses it during generation for grounded answers."
+  }
+]

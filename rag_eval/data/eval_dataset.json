@@ -1,0 +1,14 @@
+[
+  {
+    "question": "What is the capital of France?",
+    "contexts": ["France is a country in Western Europe. Its capital is Paris, which is known for the Eiffel Tower."],
+    "answer": "The capital of France is Paris.",
+    "ground_truth": "Paris"
+  },
+  {
+    "question": "Who wrote Romeo and Juliet?",
+    "contexts": ["Romeo and Juliet is a tragedy written by William Shakespeare early in his career."],
+    "answer": "William Shakespeare wrote Romeo and Juliet.",
+    "ground_truth": "William Shakespeare"
+  }
+]

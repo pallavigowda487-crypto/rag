@@ -1,0 +1,17 @@
+[
+  {
+    "question": "What upload file formats does the RAG app support?",
+    "expectedAnswer": "The app supports PDF, DOCX, and TXT document uploads.",
+    "context": "The backend upload endpoint accepts PDF, DOCX, and TXT files and rejects unsupported file types."
+  },
+  {
+    "question": "What is the maximum file size allowed for each uploaded document?",
+    "expectedAnswer": "Each uploaded document is limited to 5MB.",
+    "context": "The multer file upload configuration sets fileSize to 5 * 1024 * 1024, which is 5MB per file."
+  },
+  {
+    "question": "How many files can be uploaded in a single request?",
+    "expectedAnswer": "The app allows up to 50 files per upload request.",
+    "context": "The upload route configures multer with files: 50 and returns an error if more than 50 files are included."
+  }
+]
