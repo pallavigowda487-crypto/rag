@@ -6,8 +6,13 @@ import mammoth from "mammoth";
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import { wrapOpenAI } from "langsmith/wrappers";
 import { traceable } from "langsmith/traceable";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { config, validateConfig } from "./config.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const documentsFile = path.join(__dirname, "active-documents.json");
 
 const app = express();
 const upload = multer({
@@ -24,6 +29,30 @@ const llm = wrapOpenAI(new OpenAI({
 }));
 
 let activeDocuments = [];
+
+async function loadActiveDocuments() {
+  try {
+    const data = await readFile(documentsFile, "utf-8");
+    activeDocuments = JSON.parse(data);
+    console.log(`Loaded ${activeDocuments.length} active documents from storage.`);
+  } catch (err) {
+    activeDocuments = [];
+  }
+}
+// Load immediately on startup
+loadActiveDocuments();
+
+async function saveActiveDocuments() {
+  try {
+    // Only save locally. On Vercel this will fail silently as it's read-only, 
+    // but the pre-committed JSON file will still be loaded on startup!
+    await writeFile(documentsFile, JSON.stringify(activeDocuments, null, 2), "utf-8");
+  } catch (err) {
+    if (!process.env.VERCEL) {
+      console.error("Failed to save active documents", err);
+    }
+  }
+}
 
 app.use(cors({ origin: config.corsOrigin, credentials: false }));
 app.use(express.json({ limit: "50mb" })); // Increased limit for bulk queries if needed
@@ -114,6 +143,8 @@ app.post("/api/upload", upload.array("files", 50), async (req, res, next) => {
       activeDocuments.push(doc);
       uploadedDocs.push(doc);
     }
+    
+    await saveActiveDocuments();
 
     if (uploadedDocs.length === 0) {
       return res.status(400).json({ error: "None of the uploaded documents produced searchable text." });
@@ -212,6 +243,7 @@ app.delete("/api/reset", async (_req, res, next) => {
     const indexHost = await getIndexHost();
     await deleteNamespace(indexHost).catch(() => undefined);
     activeDocuments = [];
+    await saveActiveDocuments();
     res.json({ message: "Document vectors deleted." });
   } catch (error) {
     next(error);
