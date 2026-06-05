@@ -35,13 +35,41 @@ rag_eval/
 
 ## Quick Start
 
-1. Install dependencies:
-   - `cd rag_eval`
-   - `pip install -r requirements.txt`
+### Windows (your machine)
+
+Run checks and install helper:
+
+```powershell
+cd rag_eval
+.\setup.ps1
+```
+
+Or run these directly (do **not** use bare `pip` / `python` from repo root):
+
+```powershell
+cd rag_eval
+py --version
+py -m pip --version
+py -m pip install -r requirements.txt
+py evaluator.py
+```
+
+Why: `python` and `pip` may point to Microsoft Store stubs. The `py` launcher uses your real install at `%LOCALAPPDATA%\Python\pythoncore-3.14-64\python.exe`.
+
+If `py -m pip install` fails on Python 3.14 (missing wheels / C++ build tools), use 3.12:
+
+```powershell
+winget install Python.Python.3.12
+py -3.12 -m pip install -r requirements.txt
+py -3.12 evaluator.py
+```
+
+### General
+
+1. Install dependencies (see Windows section above).
 2. Create `.env` from `.env.example` and add keys.
 3. Put your eval records in `data/eval_dataset.json`.
-4. Run evaluation:
-   - `python evaluator.py`
+4. Run evaluation.
 5. Check outputs:
    - `results/raw/eval_results.csv`
    - `results/summaries/eval_summary.json`

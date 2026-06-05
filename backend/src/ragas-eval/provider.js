@@ -9,6 +9,14 @@ export function createRagasProvider() {
     });
   }
 
+  if (ragasConfig.providerName === "groq") {
+    return new OpenAIProvider({
+      apiKey: ragasConfig.groqApiKey,
+      model: ragasConfig.groqModel,
+      baseUrl: ragasConfig.groqApiUrl,
+    });
+  }
+
   return new MockProvider({
     score: 7.5,
     responseDelay: 0,

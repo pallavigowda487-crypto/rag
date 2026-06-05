@@ -1,8 +1,14 @@
 import json
 import os
+import sys
 from pathlib import Path
+from types import ModuleType
 
-from langchain_huggingface import HuggingFaceEmbeddings
+# Ragas still imports legacy VertexAI path removed from langchain-community 0.4+.
+_vertex_stub = ModuleType("langchain_community.chat_models.vertexai")
+_vertex_stub.ChatVertexAI = type("ChatVertexAI", (), {})
+sys.modules.setdefault("langchain_community.chat_models.vertexai", _vertex_stub)
+
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from ragas import evaluate
 from ragas.embeddings import LangchainEmbeddingsWrapper
@@ -33,23 +39,23 @@ def _build_openai_clients() -> tuple[LangchainLLMWrapper, LangchainEmbeddingsWra
 
 
 def _build_groq_clients() -> tuple[LangchainLLMWrapper, LangchainEmbeddingsWrapper]:
+    from langchain_huggingface import HuggingFaceEmbeddings
+
     groq_key = os.getenv("GROQ_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
     if not groq_key:
         raise ValueError("GROQ_API_KEY is required when provider=groq.")
-    if not openai_key:
-        raise ValueError("OPENAI_API_KEY is required for embeddings when provider=groq.")
 
-    groq_model = os.getenv("RAGAS_GROQ_MODEL", "llama-3.3-70b-versatile")
-    groq_base = os.getenv("RAGAS_GROQ_BASE_URL", "https://api.groq.com/openai/v1")
-    embedding_model = os.getenv("RAGAS_EMBEDDING_MODEL", "text-embedding-3-small")
+    groq_model = os.getenv("RAGAS_GROQ_MODEL", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
+    groq_base = os.getenv("RAGAS_GROQ_BASE_URL", os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1"))
 
     llm = ChatOpenAI(model=groq_model, api_key=groq_key, base_url=groq_base)
-    embeddings = OpenAIEmbeddings(model=embedding_model, api_key=openai_key)
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     return LangchainLLMWrapper(llm), LangchainEmbeddingsWrapper(embeddings)
 
 
 def _build_hf_embeddings_with_openai_llm() -> tuple[LangchainLLMWrapper, LangchainEmbeddingsWrapper]:
+    from langchain_huggingface import HuggingFaceEmbeddings
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY is required when provider=openai_hf.")
@@ -85,7 +91,7 @@ def run() -> None:
     output_summary_json.parent.mkdir(parents=True, exist_ok=True)
 
     df.to_csv(output_csv, index=False)
-    summary = {k: float(v) for k, v in result.items()}
+    summary = {k: float(v) for k, v in result._repr_dict.items()}
     output_summary_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     print(f"Dataset rows: {len(df)}")

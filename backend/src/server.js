@@ -7,6 +7,8 @@ import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import { wrapOpenAI } from "langsmith/wrappers";
 import { traceable } from "langsmith/traceable";
 import { readFile, writeFile } from "node:fs/promises";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config, validateConfig } from "./config.js";
@@ -246,6 +248,120 @@ app.delete("/api/reset", async (_req, res, next) => {
     await saveActiveDocuments();
     res.json({ message: "Document vectors deleted." });
   } catch (error) {
+    next(error);
+  }
+});
+
+const execAsync = promisify(exec);
+
+app.post("/api/evaluate", async (req, res, next) => {
+  try {
+    requireReadyConfig();
+    
+    if (activeDocuments.length === 0) {
+      return res.status(400).json({ error: "Please upload at least one document before evaluating." });
+    }
+
+    const evalDir = path.resolve(__dirname, "../../evaluation");
+    const scriptPath = path.join(evalDir, "evaluate.py");
+    const pythonExe = path.join(evalDir, "venv", "Scripts", "python.exe");
+
+    console.log(`Starting evaluation via script: ${scriptPath}`);
+    
+    // Execute the Python script
+    const { stdout, stderr } = await execAsync(`"${pythonExe}" "${scriptPath}"`, { 
+      cwd: evalDir,
+      timeout: 300_000 // 5 minute timeout
+    });
+    
+    console.log("Evaluation script stdout:", stdout);
+    if (stderr) console.warn("Evaluation script stderr:", stderr);
+
+    // Read and parse the JSON results directly
+    const jsonPath = path.join(evalDir, "evaluation_results.json");
+    try {
+      const jsonData = await readFile(jsonPath, "utf-8");
+      const results = JSON.parse(jsonData);
+      res.json({ message: "Evaluation complete", results });
+    } catch (parseError) {
+      console.error("Failed to read or parse JSON results:", parseError);
+      res.status(500).json({ error: "Failed to parse evaluation results from JSON" });
+    }
+  } catch (error) {
+    console.error("Evaluation error:", error);
+    next(error);
+  }
+});
+
+app.post("/api/evaluate-single", async (req, res, next) => {
+  try {
+    const { question, answer, contexts, ground_truth } = req.body;
+    if (!question) {
+      return res.status(400).json({ error: "Missing 'question' in request body." });
+    }
+
+    const evalDir = path.join(__dirname, "..", "..", "evaluation");
+    const testDataPath = path.join(evalDir, "test_data.json");
+    
+    let finalGroundTruth = ground_truth;
+
+    if (!finalGroundTruth) {
+      console.log("Generating synthetic ground truth for evaluation...");
+      try {
+        const gtCompletion = await llm.chat.completions.create({
+          model: config.llm.model,
+          temperature: 0,
+          messages: [
+            {
+              role: "system",
+              content: "You are a legal expert. Provide a direct, factual answer to the user's legal question based entirely on your own legal knowledge. Do not apologize or mention that you are an AI."
+            },
+            {
+              role: "user",
+              content: `Question: ${question}\n\nAnswer:`
+            }
+          ]
+        });
+        finalGroundTruth = gtCompletion.choices?.[0]?.message?.content?.trim() || answer;
+      } catch (gtError) {
+        console.warn("Failed to generate synthetic ground truth, falling back to answer.", gtError);
+        finalGroundTruth = answer;
+      }
+    }
+
+    const testData = [{
+      question: question,
+      answer: answer || "",
+      contexts: contexts || [],
+      ground_truth: finalGroundTruth || "No ground truth available"
+    }];
+    await writeFile(testDataPath, JSON.stringify(testData, null, 2), "utf-8");
+
+    const pythonExecutable = process.platform === "win32" 
+      ? path.join(evalDir, "venv", "Scripts", "python.exe")
+      : path.join(evalDir, "venv", "bin", "python");
+
+    const scriptPath = path.join(evalDir, "evaluate.py");
+
+    const { stdout, stderr } = await execAsync(`"${pythonExecutable}" "${scriptPath}"`, { 
+      cwd: evalDir,
+      timeout: 300000
+    });
+
+    console.log("Evaluation script stdout:", stdout);
+    if (stderr) console.warn("Evaluation script stderr:", stderr);
+
+    const jsonPath = path.join(evalDir, "evaluation_results.json");
+    try {
+      const jsonData = await readFile(jsonPath, "utf-8");
+      const results = JSON.parse(jsonData);
+      res.json({ message: "Single evaluation complete", results });
+    } catch (parseError) {
+      console.error("Failed to read or parse JSON results:", parseError);
+      res.status(500).json({ error: "Failed to parse evaluation results from JSON" });
+    }
+  } catch (error) {
+    console.error("Single evaluation error:", error);
     next(error);
   }
 });

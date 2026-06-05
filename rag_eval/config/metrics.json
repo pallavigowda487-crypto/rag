@@ -5,7 +5,7 @@
     "context_recall",
     "context_precision"
   ],
-  "provider": "openai",
+  "provider": "groq",
   "output_csv": "results/raw/eval_results.csv",
   "output_summary_json": "results/summaries/eval_summary.json"
 }

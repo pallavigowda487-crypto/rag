@@ -29,7 +29,7 @@ export const config = {
   llm: {
     provider: env("LLM_PROVIDER", "groq"),
     apiKey: env("GROQ_API_KEY"),
-    model: env("GROQ_MODEL", "llama-3.3-70b-versatile"),
+    model: env("GROQ_MODEL", "llama-3.1-8b-instant"),
     baseURL: env("GROQ_API_URL", "https://api.groq.com/openai/v1")
   },
   corsOrigin: getCorsOrigin()
