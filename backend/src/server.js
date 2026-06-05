@@ -255,42 +255,7 @@ app.delete("/api/reset", async (_req, res, next) => {
 const execAsync = promisify(exec);
 
 app.post("/api/evaluate", async (req, res, next) => {
-  try {
-    requireReadyConfig();
-    
-    if (activeDocuments.length === 0) {
-      return res.status(400).json({ error: "Please upload at least one document before evaluating." });
-    }
-
-    const evalDir = path.resolve(__dirname, "../../evaluation");
-    const scriptPath = path.join(evalDir, "evaluate.py");
-    const pythonExe = path.join(evalDir, "venv", "Scripts", "python.exe");
-
-    console.log(`Starting evaluation via script: ${scriptPath}`);
-    
-    // Execute the Python script
-    const { stdout, stderr } = await execAsync(`"${pythonExe}" "${scriptPath}"`, { 
-      cwd: evalDir,
-      timeout: 300_000 // 5 minute timeout
-    });
-    
-    console.log("Evaluation script stdout:", stdout);
-    if (stderr) console.warn("Evaluation script stderr:", stderr);
-
-    // Read and parse the JSON results directly
-    const jsonPath = path.join(evalDir, "evaluation_results.json");
-    try {
-      const jsonData = await readFile(jsonPath, "utf-8");
-      const results = JSON.parse(jsonData);
-      res.json({ message: "Evaluation complete", results });
-    } catch (parseError) {
-      console.error("Failed to read or parse JSON results:", parseError);
-      res.status(500).json({ error: "Failed to parse evaluation results from JSON" });
-    }
-  } catch (error) {
-    console.error("Evaluation error:", error);
-    next(error);
-  }
+  res.status(400).json({ error: "Batch evaluation is deprecated. Dashboard reads live chat data." });
 });
 
 app.post("/api/evaluate-single", async (req, res, next) => {
@@ -300,9 +265,6 @@ app.post("/api/evaluate-single", async (req, res, next) => {
       return res.status(400).json({ error: "Missing 'question' in request body." });
     }
 
-    const evalDir = path.join(__dirname, "..", "..", "evaluation");
-    const testDataPath = path.join(evalDir, "test_data.json");
-    
     let finalGroundTruth = ground_truth;
 
     if (!finalGroundTruth) {
@@ -314,7 +276,7 @@ app.post("/api/evaluate-single", async (req, res, next) => {
           messages: [
             {
               role: "system",
-              content: "You are a legal expert. Provide a direct, factual answer to the user's legal question based entirely on your own legal knowledge. Do not apologize or mention that you are an AI."
+              content: "You are a legal expert. Provide a direct, factual answer to the user's legal question based entirely on your own general legal knowledge. Do not apologize or mention that you are an AI. Answer directly."
             },
             {
               role: "user",
@@ -329,37 +291,17 @@ app.post("/api/evaluate-single", async (req, res, next) => {
       }
     }
 
-    const testData = [{
-      question: question,
-      answer: answer || "",
-      contexts: contexts || [],
-      ground_truth: finalGroundTruth || "No ground truth available"
-    }];
-    await writeFile(testDataPath, JSON.stringify(testData, null, 2), "utf-8");
+    const evaluationResults = await evaluateMetricsNative(question, answer || "", contexts || [], finalGroundTruth);
 
-    const pythonExecutable = process.platform === "win32" 
-      ? path.join(evalDir, "venv", "Scripts", "python.exe")
-      : path.join(evalDir, "venv", "bin", "python");
-
-    const scriptPath = path.join(evalDir, "evaluate.py");
-
-    const { stdout, stderr } = await execAsync(`"${pythonExecutable}" "${scriptPath}"`, { 
-      cwd: evalDir,
-      timeout: 300000
+    res.json({ 
+      message: "Single evaluation complete", 
+      results: {
+        questions: [{
+          question: question,
+          ...evaluationResults
+        }]
+      }
     });
-
-    console.log("Evaluation script stdout:", stdout);
-    if (stderr) console.warn("Evaluation script stderr:", stderr);
-
-    const jsonPath = path.join(evalDir, "evaluation_results.json");
-    try {
-      const jsonData = await readFile(jsonPath, "utf-8");
-      const results = JSON.parse(jsonData);
-      res.json({ message: "Single evaluation complete", results });
-    } catch (parseError) {
-      console.error("Failed to read or parse JSON results:", parseError);
-      res.status(500).json({ error: "Failed to parse evaluation results from JSON" });
-    }
   } catch (error) {
     console.error("Single evaluation error:", error);
     next(error);
@@ -636,6 +578,61 @@ const answerWithContext = traceable(async function answerWithContext(question, c
 
   return answer;
 }, { name: "answerWithContext" });
+
+const evaluateMetricsNative = traceable(async function evaluateMetricsNative(question, answer, contexts, groundTruth) {
+  const contextText = contexts.map((c, i) => `[${i+1}] ${c}`).join("\n\n");
+
+  const extractScore = (text) => {
+    const match = text.match(/0\.\d+|1\.0|0|1/);
+    return match ? parseFloat(match[0]) : 0.0;
+  };
+
+  const getMetric = async (systemPrompt, userPrompt) => {
+    try {
+      const completion = await llm.chat.completions.create({
+        model: config.llm.model,
+        temperature: 0,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ]
+      });
+      return extractScore(completion.choices?.[0]?.message?.content || "0");
+    } catch (err) {
+      console.warn("Metric evaluation failed, defaulting to 0", err);
+      return 0.0;
+    }
+  };
+
+  const pFaithfulness = getMetric(
+    "You are an expert evaluator. Evaluate if the given Answer is entirely faithful to the Context (i.e., contains no hallucinations or external information). Return a score from 0.0 to 1.0 (1.0 = completely faithful, 0.5 = partially hallucinated, 0.0 = entirely fabricated). Output ONLY the float number.",
+    `Context:\n${contextText}\n\nAnswer:\n${answer}\n\nScore:`
+  );
+
+  const pRelevancy = getMetric(
+    "You are an expert evaluator. Evaluate how directly and thoroughly the Answer addresses the specific Question asked. Return a score from 0.0 to 1.0 (1.0 = perfectly answers the question, 0.5 = somewhat relevant, 0.0 = completely irrelevant). Output ONLY the float number.",
+    `Question:\n${question}\n\nAnswer:\n${answer}\n\nScore:`
+  );
+
+  const pPrecision = getMetric(
+    "You are an expert evaluator. Given an ideal 'Ground Truth' answer and a set of retrieved 'Contexts', evaluate how precisely the contexts contain the specific information needed to answer the question, without excessive irrelevant fluff. Return a score from 0.0 to 1.0 (1.0 = highly precise context, 0.0 = mostly irrelevant noise). Output ONLY the float number.",
+    `Ground Truth:\n${groundTruth}\n\nContexts:\n${contextText}\n\nScore:`
+  );
+
+  const pRecall = getMetric(
+    "You are an expert evaluator. Given an ideal 'Ground Truth' answer and a set of retrieved 'Contexts', evaluate what fraction of the key facts from the ground truth are successfully found within the contexts. Return a score from 0.0 to 1.0 (1.0 = all facts found in context, 0.0 = no facts found). Output ONLY the float number.",
+    `Ground Truth:\n${groundTruth}\n\nContexts:\n${contextText}\n\nScore:`
+  );
+
+  const [faithfulness, answer_relevancy, context_precision, context_recall] = await Promise.all([pFaithfulness, pRelevancy, pPrecision, pRecall]);
+
+  return {
+    faithfulness: Math.max(0, Math.min(1, faithfulness)),
+    answer_relevancy: Math.max(0, Math.min(1, answer_relevancy)),
+    context_precision: Math.max(0, Math.min(1, context_precision)),
+    context_recall: Math.max(0, Math.min(1, context_recall))
+  };
+}, { name: "evaluateMetricsNative" });
 
 async function pineconeControlRequest(path, body, method = body ? "POST" : "GET") {
   return pineconeRequest(`https://api.pinecone.io${path}`, body, method, "2025-10");
